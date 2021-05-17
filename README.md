@@ -1,0 +1,2 @@
+# MindMapQ
+A matplotlib MindMap!
