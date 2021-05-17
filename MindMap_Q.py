@@ -1,19 +1,5 @@
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import numpy as np
-from scipy.spatial import cKDTree
-from itertools import cycle
-
-# use a cKDTree based picking to speed up picks for large collections
-tree = cKDTree([(1,2), (3,4)])
-
-
-
-tree.query((1,1))
-
-colors = cycle('rgb')
-
-
 
 class node():
     def __init__(self, ax, x, y, text):
