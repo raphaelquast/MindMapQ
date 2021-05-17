@@ -19,18 +19,43 @@ class node():
     def __init__(self, ax, x, y, text):
         self._x = x
         self._y = y
-        self.picked_offset = (0, 0)
-
         self.width = 0.5
         self.height = 0.2
+        self.connector_radius = self.height / 10
+        self.picked_offset = (0,0)
+
+        self.offsets = dict(u = self.height,
+                            d = 0,
+                            l = self.width / 2,
+                            r = -self.width / 2,
+                            c = 0)
 
         self.patch = mpl.patches.Rectangle((self.x - self.width / 2,
                                             self.y - self.height / 2),
                                            self.width, self.height)
+        self.patches = [self.patch]
+
+        self.connectors = dict()
+        for key in ['u_r',
+                    'u_l',
+                    'u_c',
+                    'd_r',
+                    'd_l',
+                    'd_c']:
+            ud, lr = key.split('_')
+            c = mpl.patches.Circle((self.x + self.offsets[lr],
+                                    self.y - self.height / 2 + self.offsets[ud]),
+                                    self.connector_radius, color='g')
+            self.connectors[key] = c
+
+
+
+        for p in self.patches + list(self.connectors.values()):
+            ax.add_patch(p)
 
         self.text = ax.text(self.x,
                             self.y,
-                            "a dummy text that is very very long\n and contains newlines",
+                            text,
                             horizontalalignment = 'center',
                             verticalalignment = 'center'
                             )
@@ -41,11 +66,19 @@ class node():
 
     @x.setter
     def x(self, x):
+        self._x = x
         xoffset, yoffset = self.picked_offset
 
-        self._x = x
-        self.patch.set_x(self.x - xoffset)
-        self.text.set_x(self.x - xoffset + self.width / 2)
+        for p in self.patches:
+            p.set_x(self.x - xoffset)
+
+        for key, p in self.connectors.items():
+
+            ud, lr = key.split('_')
+            p.set_center((self.x + self.offsets[lr] - xoffset,
+                          self.y + self.offsets[ud] + yoffset))
+
+        self.text.set_x(self.x + self.width / 2 - xoffset)
 
     @property
     def y(self):
@@ -53,11 +86,21 @@ class node():
 
     @y.setter
     def y(self, y):
+        self._y = y
         xoffset, yoffset = self.picked_offset
 
-        self._y = y
-        self.patch.set_y(self.y - yoffset)
-        self.text.set_y(self.y - yoffset + self.height / 2)
+        for p in self.patches:
+            p.set_y(self.y - yoffset)
+
+        for key, p in self.connectors.items():
+            ud, lr = key.split('_')
+            p.set_center((self.x + self.offsets[lr] + self.width / 2 - xoffset,
+                          self.y + self.offsets[ud] - yoffset))
+
+        self.text.set_y(self.y + self.height / 2 - yoffset)
+
+
+
 
 
 
@@ -78,9 +121,7 @@ class MindMap():
         self.pressed = False
         self.picked = None
 
-        n = node(self.ax, 0.5, 0.5, 'asdf')
-        self.picked = n
-        self.ax.add_patch(n.patch)
+        n = node(self.ax, 0.5, 0.5, "a dummy text that is very very long\n and contains newlines")
         self.nodes.append(n)
 
 
@@ -110,6 +151,7 @@ class MindMap():
                 x, y = n.patch.xy
                 self.picked.picked_offset = (event.xdata - x,
                                              event.ydata - y)
+
         self.f.canvas.draw()
 
 
@@ -133,6 +175,9 @@ class MindMap():
 
     def mouse_move(self, event):
         if not self.event_valid(event):
+            return
+
+        if not self.picked:
             return
 
         if self.picked is not None:
