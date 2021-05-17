@@ -78,10 +78,29 @@ class MindMap():
         self.pressed = False
         self.picked = None
 
-    def mouse_down(self, *args):
+        n = node(self.ax, 0.5, 0.5, 'asdf')
+        self.picked = n
+        self.ax.add_patch(n.patch)
+        self.nodes.append(n)
+
+
+
+    def event_valid(self, event):
+        if self.ax.get_navigate_mode()!= None:
+            return False
+        elif not event.inaxes:
+            return False
+        elif event.inaxes != self.ax:
+            return False
+        else:
+            return True
+
+
+    def mouse_down(self, event):
+        if not self.event_valid(event):
+            return
+
         self.pressed = True
-        self.picked = None
-        event, = args
 
         for n in self.nodes:
             if n.patch.contains_point(self.ax.transData.transform((event.xdata,
@@ -92,22 +111,15 @@ class MindMap():
                 self.picked.picked_offset = (event.xdata - x,
                                              event.ydata - y)
         self.f.canvas.draw()
-        print(self.pressed, self.picked.x, self.picked.y)
 
 
-    def mouse_up(self, *args):
+    def mouse_up(self, event):
+        if not self.event_valid(event):
+            return
+
         self.pressed = False
-        event, = args
 
         if self.picked is None:
-            width = 0.5
-            height = 0.2
-
-            patch = mpl.patches.Rectangle((event.xdata - width / 2,
-                                           event.ydata - height / 2),
-                                          width,
-                                          height)
-
             n = node(self.ax, event.xdata, event.ydata, 'asdf')
 
             self.ax.add_patch(n.patch)
@@ -120,6 +132,8 @@ class MindMap():
 
 
     def mouse_move(self, event):
+        if not self.event_valid(event):
+            return
 
         if self.picked is not None:
             self.picked.x = event.xdata
@@ -146,54 +160,3 @@ m = MindMap()
  'xdata': 0.3326612903225806,
  'ydata': 0.6066017316017318}
 
-
-
-
-
-
-
-
-
-# %%
-
-
-
-
-
-
-
-
-# use a cKDTree based picking to speed up picks for large collections
-tree = cKDTree(np.stack([x0, y0], axis=1))
-maxdist = np.max([w.max(), h.max()])
-
-def picker(artist, event):
-    if event.dblclick:
-        dist, index = tree.query((event.xdata, event.ydata))
-        if dist < maxdist:
-            return True, dict(ind=index)
-        else:
-            if self.cb_annotate in np.atleast_1d(callback):
-                self._cb_hide_annotate()
-    return False, None
-
-coll.set_picker(picker)
-
-
-
-def onpick(event):
-    if isinstance(event.artist, collections.EllipseCollection):
-        ind = event.ind
-
-        clickdict = dict(
-            pos=coll.get_offsets()[ind],
-            ID=coll.get_urls()[ind],
-            val=coll.get_array()[ind],
-            f=f,
-        )
-
-        if callback is not None:
-            for cb_i in np.atleast_1d(callback):
-                cb_i(**clickdict)
-
-f.canvas.mpl_connect("pick_event", onpick)
