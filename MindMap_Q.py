@@ -5,7 +5,7 @@ from matplotlib.textpath import TextPath
 from matplotlib.patches import PathPatch
 from matplotlib.font_manager import FontProperties
 from matplotlib.path import Path as mPath
-
+from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
 from pathlib import Path
 import pickle
 
@@ -32,7 +32,7 @@ class node():
         # ------------------------------------------------------
         x0, y0 = self.x - self.width / 2, self.y - self.height / 2
         x1, y1 = x0 + self.width, y0 + self.height
-        patch = PathPatch(None, facecolor='green', edgecolor='yellow', alpha=0.5)
+        patch = PathPatch(None, facecolor='C5', edgecolor='C6', alpha=0.5)
         self.updatepath(patch, x0, x1, y0, y1)
 
         self.patches = [self.patch,
@@ -50,7 +50,7 @@ class node():
             ud, lr = key.split('_')
             c = mpl.patches.Circle((self.x + self.offsets[lr],
                                     self.y - self.height / 2 + self.offsets[ud]),
-                                    self.connector_radius, color='g')
+                                    self.connector_radius, color='C0')
             self.connectors[key] = c
 
 
@@ -62,8 +62,8 @@ class node():
                             self.y,
                             text,
                             horizontalalignment = 'center',
-                            verticalalignment = 'center'
-                            )
+                            verticalalignment = 'center',
+                            usetex=False)
 
 
         from matplotlib.textpath import TextToPath
@@ -295,7 +295,7 @@ class TextInput():
         self.node = node
         self.text_box = newtextbox(ax, label="Text:", initial="asdf")
         self.text_box.on_submit(self.set_text)
-        self.text_box._rendercursor()
+        #self.text_box._rendercursor()
 
         self.connect(node)
 
@@ -325,42 +325,33 @@ def load(savepath):
 
 
 class MindMap():
-    def __init__(self, savepath=None, load=False, f=None, ax=None, nodes=None):
-        if load:
-
-            m
-
-            self.f = plt.figure(figsize=(16,9))
-            #self.ax = self.f.add_subplot()
-            self.ax = self.f.add_axes([0, 0.2, 1, 0.8], xticks=[], yticks=[], xticklabels=[], yticklabels=[])
-            self.nodes = []
-
-            #self.f.subplots_adjust(left=0, right=1, bottom=0, top=1)
-        else:
-            self.f = f
-            self.ax = ax
-            self.nodes = nodes
-
-
+    def __init__(self, savepath=None, f=None, ax=None, nodes=None):
 
         self.savepath = savepath
 
         if not (ax and f and nodes):
             self.f = plt.figure(figsize=(16,9))
             #self.ax = self.f.add_subplot()
-            self.ax = self.f.add_axes([0, 0.2, 1, 0.8], xticks=[], yticks=[], xticklabels=[], yticklabels=[])
+            self.ax = self.f.add_axes([0, 0.2, 1, 0.8],
+                                      #xticks=[], yticks=[], xticklabels=[], yticklabels=[]
+                                      )
+            self.ax.tick_params(labelleft=False, labelright=False,
+                                labeltop=False, labelbottom=False,
+                                left=False, right=False, top=False, bottom=False)
+
             self.nodes = []
 
-            #self.f.subplots_adjust(left=0, right=1, bottom=0, top=1)
         else:
             self.f = f
             self.ax = ax
             self.nodes = nodes
 
+        # avoid showing coordinates in the toolbar
+        #self.ax.format_coord = lambda x, y: ""
 
         # make sure aspect-ratio remains equal when zooming
         self.ax.set_aspect(9/16)
-        #self.ax.set_axis_off()
+
 
         self.ax_txt = self.f.add_axes([0.1, 0.05, 0.8, 0.075])
         self.inputbox = TextInput(self.ax_txt, None)
@@ -374,9 +365,46 @@ class MindMap():
         self.picked = None
         self.edit_node = None
 
+        # grid-snap base
+        self.round_base = 0.05
 
         # n = node(self.ax, 0.5, 0.5, "a dummy text that is very very long\n and contains newlines")
         # self.nodes.append(n)
+
+    @property
+    def round_base(self):
+        return self._round_base
+
+    @round_base.setter
+    def round_base(self, val):
+        try:
+            val = float(val)
+        except:
+            return
+
+        if val <= 0.01:
+            return
+
+        self._round_base = val
+
+        # set ticks for grid
+        self.ax.xaxis.set_major_locator(MultipleLocator(val))
+        self.ax.yaxis.set_major_locator(MultipleLocator(val))
+
+        self.f.canvas.draw()
+
+        # # Change minor ticks to show every 5. (20/4 = 5)
+        # self.ax.xaxis.set_minor_locator(AutoMinorLocator(10))
+        # self.ax.yaxis.set_minor_locator(AutoMinorLocator(10))
+
+
+    def roundxy(self, x, y, base=None):
+        if base is None:
+            base = self.round_base
+
+        return round(x / base) * base, round(y / base) * base
+
+
 
     @staticmethod
     def load(savepath):
@@ -390,7 +418,10 @@ class MindMap():
         m = MindMap(savepath=savepath, f=f, ax=f.axes[0], nodes=f.Q_nodes)
         return m
 
-    def dump(self):
+    def dump(self, savepath=None):
+        if savepath is None:
+            savepath = self.savepath
+
         if self.savepath is None:
             return
 
@@ -414,18 +445,23 @@ class MindMap():
         if not self.event_valid(event):
             return
 
+        mx, my = self.roundxy(event.xdata, event.ydata)
+
         self.pressed = True
         self.picked = None
         self.edit_node = None
         for n in self.nodes:
-            if n.patch.contains_point(self.ax.transData.transform((event.xdata,
-                                                                   event.ydata))):
-                n.patch.set_color('r')
+            if n.patch.contains_point(self.ax.transData.transform((mx, my))):
+                n.patch.set_color('C3')
                 self.picked = n
                 x, y = n.patch.xy
-                self.picked.picked_offset = (event.xdata - x,
-                                             event.ydata - y)
+                self.picked.picked_offset = (mx - x,
+                                             my - y)
                 self.edit_node = n
+
+        if hasattr(self, "gui") and self.edit_node is not None:
+            self.gui['node_txt'].update(self.edit_node.text.get_text())
+
 
         self.f.canvas.draw()
 
@@ -433,13 +469,15 @@ class MindMap():
         if not self.event_valid(event):
             return
 
+        mx, my = self.roundxy(event.xdata, event.ydata)
+
         self.pressed = False
 
         if self.picked is None:
-            n = node(self.ax, event.xdata, event.ydata, self.inputbox.text_box.text)#'asdf')
+            n = node(self.ax, mx, my, self.inputbox.text_box.text)
             self.nodes.append(n)
         else:
-            self.picked.patch.set_color('b')
+            self.picked.patch.set_color('C2')
 
 
         if self.edit_node is not None:
@@ -447,28 +485,33 @@ class MindMap():
 
         self.picked = None
         self.f.canvas.draw()
-        self.dump()
+        #self.dump()
 
 
     def mouse_move(self, event):
         if not self.event_valid(event):
             return
 
+        mx, my = self.roundxy(event.xdata, event.ydata)
+
         if not self.picked:
             return
 
         if self.picked is not None:
-            self.picked.x = event.xdata
-            self.picked.y = event.ydata
+            self.picked.x = mx
+            self.picked.y = my
 
             self.f.canvas.draw()
 
 # %%
-if False:
-    m = MindMap.load(savepath=r"D:\python_modules\MindMap_Q")
-else:
-    m = MindMap(savepath=r"D:\python_modules\MindMap_Q")
+if __name__ == "__main__":
 
+    load = True
+
+    if load:
+        m = MindMap.load(savepath=r"D:\python_modules\MindMap_Q")
+    else:
+        m = MindMap(savepath=r"D:\python_modules\MindMap_Q")
 
 
 # %%
